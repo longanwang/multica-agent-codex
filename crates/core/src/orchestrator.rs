@@ -1,6 +1,6 @@
 use crate::acp::AcpProcessClient;
 use crate::store::Store;
-use crate::types::{AgentProfile, AgentRun, RunStatus, TaskSpec, TaskSummary};
+use crate::types::{AgentLaunch, AgentProfile, AgentRun, AgentRuntime, RunStatus, TaskSpec, TaskSummary};
 use anyhow::{Context, Result};
 use chrono::Utc;
 use std::time::Duration;
@@ -75,12 +75,12 @@ async fn run_single_agent(
     let mut run = AgentRun::started(task_id, agent.id.clone());
     store.upsert_agent_run(&run)?;
 
-    let result = if agent.launch.command == "multica-fake" {
-        run_fake_agent(&agent, &prompt).await
-    } else {
-        AcpProcessClient::run_prompt(&agent.launch, &prompt, agent.launch.cwd.clone())
+    let result = match agent.runtime {
+        AgentRuntime::Fixture => run_fake_agent(&agent, &prompt).await,
+        AgentRuntime::AcpStdio => AcpProcessClient::run_prompt(&agent.launch, &prompt, agent.launch.cwd.clone())
             .await
-            .map(|result| result.text)
+            .map(|result| result.text),
+        AgentRuntime::Cli => run_cli_agent(&agent, &prompt).await,
     };
 
     run.completed_at = Some(Utc::now());
@@ -98,18 +98,103 @@ async fn run_single_agent(
     Ok(run)
 }
 
+async fn run_cli_agent(agent: &AgentProfile, prompt: &str) -> Result<String> {
+    let launch = cli_launch_for_prompt(agent, prompt);
+    let mut command = crate::process::command_with_args(&launch.command, &launch.args);
+    if let Some(cwd) = &launch.cwd {
+        command.current_dir(cwd);
+    }
+    for (key, value) in &launch.env {
+        command.env(key, value);
+    }
+
+    let output = tokio::time::timeout(Duration::from_secs(900), command.output())
+        .await
+        .context("agent CLI run timed out after 15 minutes")?
+        .with_context(|| format!("failed to spawn agent CLI {}", launch.command))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if output.status.success() {
+        if stdout.is_empty() && !stderr.is_empty() {
+            return Ok(stderr);
+        }
+        return Ok(stdout);
+    }
+
+    anyhow::bail!(
+        "{} exited with status {}{}{}",
+        agent.name,
+        output.status,
+        if stderr.is_empty() { "" } else { ": " },
+        stderr
+    )
+}
+
+fn cli_launch_for_prompt(agent: &AgentProfile, prompt: &str) -> AgentLaunch {
+    let mut launch = agent.launch.clone();
+    let command_name = std::path::Path::new(&launch.command)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or(&launch.command)
+        .to_ascii_lowercase();
+
+    match agent.id.as_str() {
+        "claude-code" if launch.args.is_empty() => {
+            launch.args = vec![
+                "-p".to_string(),
+                "--output-format".to_string(),
+                "text".to_string(),
+                "--permission-mode".to_string(),
+                "plan".to_string(),
+                prompt.to_string(),
+            ];
+        }
+        "codex" if launch.args.is_empty() => {
+            launch.args = vec![
+                "exec".to_string(),
+                "--ask-for-approval".to_string(),
+                "never".to_string(),
+                "--sandbox".to_string(),
+                "read-only".to_string(),
+                prompt.to_string(),
+            ];
+        }
+        "gemini" if launch.args.is_empty() => {
+            launch.args = vec!["-p".to_string(), prompt.to_string()];
+        }
+        "opencode" if launch.args.is_empty() => {
+            launch.args = vec!["run".to_string(), prompt.to_string()];
+        }
+        _ if launch.args.is_empty() && command_name.contains("claude") => {
+            launch.args = vec!["-p".to_string(), "--output-format".to_string(), "text".to_string(), prompt.to_string()];
+        }
+        _ if launch.args.is_empty() && command_name.contains("codex") => {
+            launch.args = vec!["exec".to_string(), "--ask-for-approval".to_string(), "never".to_string(), "--sandbox".to_string(), "read-only".to_string(), prompt.to_string()];
+        }
+        _ if launch.args.is_empty() && command_name.contains("gemini") => {
+            launch.args = vec!["-p".to_string(), prompt.to_string()];
+        }
+        _ => {
+            launch.args.push(prompt.to_string());
+        }
+    }
+
+    launch
+}
+
 async fn run_fake_agent(agent: &AgentProfile, prompt: &str) -> Result<String> {
     let mode = agent.launch.args.get(0).map(String::as_str).unwrap_or("success");
     match mode {
-        "fail" => anyhow::bail!("fixture agent was asked to fail"),
+        "fail" => anyhow::bail!("模拟智能体按要求返回失败"),
         "timeout" => {
             tokio::time::sleep(Duration::from_millis(250)).await;
-            anyhow::bail!("fixture agent timed out")
+            anyhow::bail!("模拟智能体运行超时")
         }
         _ => {
             tokio::time::sleep(Duration::from_millis(40)).await;
             Ok(format!(
-                "{} completed fixture run for prompt: {}",
+                "{} 已完成模拟运行，提示词：{}",
                 agent.name,
                 prompt.chars().take(120).collect::<String>()
             ))
@@ -147,5 +232,31 @@ mod tests {
             .runs
             .iter()
             .any(|run| matches!(run.status, RunStatus::Failed)));
+    }
+
+    #[tokio::test]
+    async fn runs_cli_agent_with_prompt_argument() {
+        let store = Store::in_memory().unwrap();
+        let mut echo = manual_profile(
+            "Echo CLI",
+            "node",
+            vec![
+                "-e".into(),
+                "console.log(`echo:${process.argv.slice(1).join(' ')}`)".into(),
+            ],
+        );
+        echo.id = "echo-cli".to_string();
+        store.upsert_agent(&echo).unwrap();
+
+        let orchestrator = Orchestrator::new(store);
+        let spec = TaskSpec::new(
+            "CLI smoke",
+            "hello from multica",
+            vec!["echo-cli".into()],
+            RequestSource::LocalUser,
+        );
+        let summary = orchestrator.run_task(spec).await.unwrap();
+        assert_eq!(summary.status, RunStatus::Succeeded);
+        assert_eq!(summary.runs[0].result.as_deref(), Some("echo:hello from multica"));
     }
 }

@@ -47,7 +47,7 @@ impl MulticaCore {
     pub async fn refresh_agents(&self) -> Result<Vec<AgentProfile>> {
         let agents = self.discovery.discover().await?;
         self.store.upsert_agents(&agents)?;
-        Ok(agents)
+        self.store.list_agents()
     }
 
     pub fn add_manual_agent(
@@ -141,7 +141,6 @@ mod tests {
             .result
             .as_ref()
             .unwrap()
-            .contains("Fixture Fast Reviewer"));
+            .contains("模拟快速审阅器"));
     }
 }
-

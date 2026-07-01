@@ -166,6 +166,27 @@ button {
   flex-shrink: 0;
 }
 
+.runtime-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.runtime-badge.desktop {
+  color: #0d6d5d;
+  background: #e6faf5;
+}
+
+.runtime-badge.web {
+  color: #7a4d08;
+  background: #fff3d6;
+}
+
 .icon-button,
 .primary-button,
 .secondary-button {
@@ -242,6 +263,24 @@ button {
   gap: 12px;
 }
 
+.runtime-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #f0d49a;
+  border-radius: 8px;
+  background: #fff8e8;
+  color: #6e4b0c;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.runtime-banner svg {
+  flex-shrink: 0;
+}
+
 .metric {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -286,6 +325,37 @@ button {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   align-items: start;
+}
+
+.workspace-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.34fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.workspace-main,
+.workspace-side {
+  min-width: 0;
+}
+
+.workspace-side {
+  padding: 18px;
+  border: 1px solid #dbe4eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.toolbar-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.toolbar-panel-header .panel-header {
+  margin-bottom: 0;
 }
 
 .panel,
@@ -344,6 +414,47 @@ button {
 .timeline {
   display: grid;
   gap: 10px;
+}
+
+.manual-agent-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.manual-agent-form label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.manual-agent-form label > span {
+  color: #687681;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.manual-agent-form input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid #d9e3ea;
+  border-radius: 8px;
+  background: #fbfdfe;
+  color: #172026;
+  font-size: 13px;
+  outline: none;
+}
+
+.manual-agent-form input:focus {
+  border-color: #40c4aa;
+  box-shadow: 0 0 0 3px rgba(64, 196, 170, 0.14);
+}
+
+.roster-refresh {
+  margin-bottom: 12px;
 }
 
 .agent-row {
@@ -454,7 +565,8 @@ button {
 }
 
 .task-form input,
-.task-form textarea {
+.task-form textarea,
+.task-form select {
   width: 100%;
   border: 1px solid #d9e3ea;
   border-radius: 8px;
@@ -470,16 +582,70 @@ button {
   padding: 0 11px;
 }
 
+.task-form select {
+  min-height: 38px;
+  padding: 0 11px;
+}
+
 .task-form textarea {
   resize: vertical;
   min-height: 118px;
   padding: 10px 11px;
 }
 
+.task-form.large textarea {
+  min-height: 220px;
+}
+
 .task-form input:focus,
-.task-form textarea:focus {
+.task-form textarea:focus,
+.task-form select:focus {
   border-color: #40c4aa;
   box-shadow: 0 0 0 3px rgba(64, 196, 170, 0.14);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.compact-agent-list,
+.detail-list {
+  display: grid;
+  gap: 10px;
+}
+
+.detail-line {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 10px;
+  margin: 0;
+  padding: 10px 0;
+  border-bottom: 1px solid #eef3f7;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.detail-line span {
+  color: #71808c;
+  font-weight: 800;
+}
+
+.detail-line strong {
+  overflow: hidden;
+  color: #172026;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connector-status .muted-copy,
+.muted-copy {
+  margin: 14px 0 0;
+  color: #687681;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .approval-card {
@@ -508,6 +674,18 @@ button {
   color: #71624b;
   font-size: 12px;
   line-height: 1.45;
+}
+
+.approval-card.expanded p {
+  display: block;
+  -webkit-line-clamp: unset;
+}
+
+.approval-card small {
+  display: block;
+  margin-top: 8px;
+  color: #8a785d;
+  font-size: 11px;
 }
 
 .approval-actions {
@@ -737,6 +915,7 @@ button {
 
 @media (max-width: 1340px) {
   .workspace-grid,
+  .workspace-split,
   .metric-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -791,18 +970,25 @@ button {
 
   .topbar-actions {
     justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .workspace-grid,
+  .workspace-split,
   .metric-strip,
   .capability-grid,
   .run-list,
-  .connector-board {
+  .connector-board,
+  .form-grid {
     grid-template-columns: 1fr;
   }
 
   .span-2 {
     grid-column: auto;
+  }
+
+  .manual-agent-form {
+    grid-template-columns: 1fr;
   }
 
   .metric {

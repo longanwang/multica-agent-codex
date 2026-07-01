@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines};
-use tokio::process::{Child, ChildStdin, ChildStdout, Command};
+use tokio::process::{Child, ChildStdin, ChildStdout};
 
 pub struct AcpProcessClient {
     child: Child,
@@ -22,8 +22,7 @@ pub struct AcpPromptResult {
 
 impl AcpProcessClient {
     pub async fn spawn(launch: &AgentLaunch) -> Result<Self> {
-        let mut command = Command::new(&launch.command);
-        command.args(&launch.args);
+        let mut command = crate::process::command_with_stdio(&launch.command, &launch.args);
         command.stdin(Stdio::piped());
         command.stdout(Stdio::piped());
         command.stderr(Stdio::piped());
@@ -156,7 +155,7 @@ impl AcpProcessClient {
                     "id": id,
                     "result": {
                         "outcome": "denied",
-                        "message": "Multica MVP requires explicit desktop approval for agent-initiated client actions."
+                        "message": "Multica MVP 要求智能体发起的客户端动作先经过桌面端明确审批。"
                     }
                 });
                 let mut line = serde_json::to_vec(&response)?;
@@ -213,4 +212,3 @@ mod tests {
         );
     }
 }
-

@@ -1,5 +1,5 @@
 import { makeMockTask, mockDashboard } from './mockData';
-import type { CapabilityInventory, DashboardSnapshot, TaskSummary } from './types';
+import type { AgentProfile, CapabilityInventory, DashboardSnapshot, PermissionRequest, TaskSummary } from './types';
 
 type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
@@ -31,6 +31,51 @@ const mockInvoke: Invoke = async (command, args) => {
     const payload = args as { title: string; prompt: string; agent_ids: string[] };
     return makeMockTask(payload.title, payload.prompt, payload.agent_ids) as never;
   }
+  if (command === 'add_manual_agent') {
+    const payload = args as { name: string; command: string; args: string[] };
+    return {
+      id: `manual-${slug(payload.name)}`,
+      name: payload.name,
+      version: null,
+      launch: {
+        command: payload.command,
+        args: payload.args,
+        env: {},
+        cwd: null,
+      },
+      runtime: 'cli',
+      acp: 'unknown',
+      source: 'manual',
+      detectedPath: null,
+      lastSeen: new Date().toISOString(),
+    } satisfies AgentProfile as never;
+  }
+  if (command === 'ingest_connector_message') {
+    const payload = args as {
+      connector: string;
+      tenant_id: string;
+      conversation_id: string;
+      sender_id: string;
+      text: string;
+      raw: unknown;
+    };
+    return {
+      id: crypto.randomUUID(),
+      taskId: null,
+      connectorMessageId: crypto.randomUUID(),
+      kind: 'connectorReply',
+      summary: `${payload.connector} 用户 ${payload.sender_id} 请求启动智能体任务`,
+      details: {
+        connector: payload.connector,
+        tenantId: payload.tenant_id,
+        conversationId: payload.conversation_id,
+        senderId: payload.sender_id,
+        preview: payload.text.slice(0, 240),
+      },
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    } satisfies PermissionRequest as never;
+  }
   if (command === 'decide_permission') {
     return undefined as never;
   }
@@ -38,11 +83,36 @@ const mockInvoke: Invoke = async (command, args) => {
 };
 
 export const api = {
+  isDesktopRuntime: isTauriRuntime,
   dashboardSnapshot: () => invoke<DashboardSnapshot>('dashboard_snapshot'),
   refreshAgents: () => invoke<DashboardSnapshot['agents']>('refresh_agents'),
   refreshCapabilities: () => invoke<CapabilityInventory[]>('refresh_capabilities'),
   createTask: (title: string, prompt: string, agentIds: string[]) =>
     invoke<TaskSummary>('create_task', { title, prompt, agent_ids: agentIds }),
+  addManualAgent: (name: string, command: string, args: string[]) =>
+    invoke<AgentProfile>('add_manual_agent', { name, command, args }),
+  ingestConnectorMessage: (message: {
+    connector: string;
+    tenantId: string;
+    conversationId: string;
+    senderId: string;
+    text: string;
+  }) =>
+    invoke<PermissionRequest>('ingest_connector_message', {
+      connector: message.connector,
+      tenant_id: message.tenantId,
+      conversation_id: message.conversationId,
+      sender_id: message.senderId,
+      text: message.text,
+      raw: message,
+    }),
   decidePermission: (requestId: string, approved: boolean) =>
     invoke<void>('decide_permission', { request_id: requestId, approved }),
 };
+
+function slug(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^\p{Letter}\p{Number}]+/gu, '-')
+    .replace(/(^-|-$)/g, '');
+}

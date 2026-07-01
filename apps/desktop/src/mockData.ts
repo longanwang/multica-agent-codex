@@ -6,10 +6,11 @@ export const mockDashboard: DashboardSnapshot = {
   agents: [
     {
       id: 'fixture-fast-reviewer',
-      name: 'Fixture Fast Reviewer',
+      name: '模拟快速审阅器',
       version: '0.1.0',
       source: 'fixture',
       acp: 'supported',
+      runtime: 'fixture',
       detectedPath: null,
       lastSeen: now,
       launch: {
@@ -25,6 +26,7 @@ export const mockDashboard: DashboardSnapshot = {
       version: null,
       source: 'path',
       acp: 'unknown',
+      runtime: 'cli',
       detectedPath: 'C:\\Users\\you\\AppData\\Roaming\\npm\\claude.cmd',
       lastSeen: now,
       launch: {
@@ -40,6 +42,7 @@ export const mockDashboard: DashboardSnapshot = {
       version: null,
       source: 'path',
       acp: 'unknown',
+      runtime: 'cli',
       detectedPath: 'C:\\Users\\you\\AppData\\Roaming\\npm\\gemini.cmd',
       lastSeen: now,
       launch: {
@@ -58,13 +61,13 @@ export const mockDashboard: DashboardSnapshot = {
       models: [
         {
           id: 'fixture-small',
-          label: 'Fixture Small',
+          label: '模拟小模型',
           sourceAgent: 'fixture-fast-reviewer',
           provider: null,
         },
         {
           id: 'fixture-large',
-          label: 'Fixture Large',
+          label: '模拟大模型',
           sourceAgent: 'fixture-fast-reviewer',
           provider: null,
         },
@@ -72,9 +75,9 @@ export const mockDashboard: DashboardSnapshot = {
       skills: [
         {
           id: 'fixture-fast-reviewer:fixture-review',
-          name: 'fixture-review',
+          name: '模拟审阅',
           sourceAgent: 'fixture-fast-reviewer',
-          description: 'Deterministic test skill used by Multica capability scanner tests.',
+          description: '用于验证 Multica 能力扫描流程的确定性测试技能。',
           sourcePath: 'crates/core/tests/fixtures/skills/review/SKILL.md',
         },
       ],
@@ -92,13 +95,13 @@ export const mockDashboard: DashboardSnapshot = {
         {
           name: '/review',
           sourceAgent: 'fixture-fast-reviewer',
-          description: 'Run a deterministic fixture review',
+          description: '运行一次确定性的模拟审阅',
         },
       ],
       configOptions: [
         {
           id: 'fixture-small',
-          label: 'Fixture Small',
+          label: '模拟小模型',
           category: 'model',
           valueType: 'select',
           choices: ['fixture-small', 'fixture-large'],
@@ -113,8 +116,8 @@ export const mockDashboard: DashboardSnapshot = {
       completedAt: now,
       task: {
         id: 'task-demo',
-        title: 'Architecture Review',
-        prompt: 'Review the orchestrator design and summarize risks.',
+        title: '架构审阅',
+        prompt: '审阅编排器设计并总结主要风险。',
         agentIds: ['fixture-fast-reviewer', 'claude-code'],
         requestedBy: 'localUser',
         createdAt: now,
@@ -126,7 +129,7 @@ export const mockDashboard: DashboardSnapshot = {
           agentId: 'fixture-fast-reviewer',
           status: 'succeeded',
           result:
-            'Fixture Fast Reviewer completed fixture run for prompt: Review the orchestrator design and summarize risks.',
+            '模拟快速审阅器已完成任务：审阅编排器设计并总结主要风险。',
           startedAt: now,
           completedAt: now,
         },
@@ -135,7 +138,7 @@ export const mockDashboard: DashboardSnapshot = {
           taskId: 'task-demo',
           agentId: 'claude-code',
           status: 'failed',
-          error: 'Agent command not available in browser preview.',
+          error: '浏览器预览模式无法调用真实智能体命令。',
           startedAt: now,
           completedAt: now,
         },
@@ -148,7 +151,7 @@ export const mockDashboard: DashboardSnapshot = {
       taskId: null,
       connectorMessageId: 'feishu-msg-001',
       kind: 'connectorReply',
-      summary: 'Feishu message from user_42 wants to start an agent task',
+      summary: '飞书用户 user_42 请求启动智能体任务',
       details: {
         connector: 'feishu',
         tenantId: 'tenant_demo',
@@ -182,15 +185,14 @@ export function makeMockTask(title: string, prompt: string, agentIds: string[]):
       status: agentId === 'fixture-fast-reviewer' ? 'succeeded' : 'failed',
       result:
         agentId === 'fixture-fast-reviewer'
-          ? `Browser preview fixture completed: ${prompt.slice(0, 120)}`
+          ? `浏览器预览模拟运行完成：${prompt.slice(0, 120)}`
           : null,
       error:
         agentId === 'fixture-fast-reviewer'
           ? null
-          : 'Real ACP agent execution is available in Tauri desktop mode.',
+          : '真实 ACP 智能体执行需要在 Tauri 桌面模式中使用。',
       startedAt: createdAt,
       completedAt: createdAt,
     })),
   };
 }
-

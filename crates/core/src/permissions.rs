@@ -20,7 +20,7 @@ impl PermissionBroker {
         let mut request = PermissionRequest::pending(
             PermissionKind::ConnectorReply,
             format!(
-                "{} message from {} wants to start an agent task",
+                "{} 用户 {} 请求启动智能体任务",
                 message.connector, message.sender_id
             ),
             json!({
@@ -67,4 +67,3 @@ impl PermissionBroker {
         Ok(stale)
     }
 }
-

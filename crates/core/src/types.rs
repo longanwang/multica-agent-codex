@@ -16,6 +16,20 @@ pub struct AgentLaunch {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub enum AgentRuntime {
+    AcpStdio,
+    Cli,
+    Fixture,
+}
+
+impl Default for AgentRuntime {
+    fn default() -> Self {
+        Self::Cli
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub enum AcpSupport {
     Unknown,
     Supported,
@@ -39,6 +53,8 @@ pub struct AgentProfile {
     pub name: String,
     pub version: Option<String>,
     pub launch: AgentLaunch,
+    #[serde(default)]
+    pub runtime: AgentRuntime,
     pub acp: AcpSupport,
     pub source: AgentSource,
     pub detected_path: Option<String>,
@@ -324,4 +340,3 @@ pub struct DashboardSnapshot {
     pub tasks: Vec<TaskSummary>,
     pub approvals: Vec<PermissionRequest>,
 }
-

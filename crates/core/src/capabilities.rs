@@ -8,7 +8,6 @@ use glob::glob;
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use tokio::process::Command;
 
 #[derive(Debug, Clone)]
 pub struct CapabilityScanner {
@@ -108,7 +107,22 @@ impl CapabilityScanner {
                 .join(".claude")
                 .join("skills")
                 .join("*")
-                .join("SKILL.md")],
+                .join("SKILL.md"),
+                self.home_dir
+                    .join(".claude")
+                    .join("commands")
+                    .join("*.md")],
+            "gemini" => vec![
+                self.home_dir
+                    .join(".gemini")
+                    .join("extensions")
+                    .join("*")
+                    .join("GEMINI.md"),
+                self.home_dir
+                    .join(".gemini")
+                    .join("commands")
+                    .join("*.toml"),
+            ],
             "opencode" => vec![self
                 .home_dir
                 .join(".config")
@@ -133,12 +147,23 @@ impl CapabilityScanner {
     fn scan_mcp_servers(&self, agent: &AgentProfile) -> Result<Vec<McpServerRef>> {
         let patterns = match agent.id.as_str() {
             "codex" => vec![self.home_dir.join(".codex").join("config.toml")],
-            "claude-code" => vec![self.home_dir.join(".claude").join("mcp.json")],
-            "opencode" => vec![self
-                .home_dir
-                .join(".config")
-                .join("opencode")
-                .join("opencode.json")],
+            "claude-code" => vec![
+                self.home_dir.join(".claude").join("mcp.json"),
+                self.home_dir.join(".claude").join("settings.json"),
+                self.home_dir.join(".claude.json"),
+            ],
+            "gemini" => vec![self.home_dir.join(".gemini").join("settings.json")],
+            "opencode" => vec![
+                self.home_dir
+                    .join(".config")
+                    .join("opencode")
+                    .join("opencode.json"),
+                self.home_dir
+                    .join("AppData")
+                    .join("Roaming")
+                    .join("opencode")
+                    .join("opencode.json"),
+            ],
             "fixture-fast-reviewer" => vec![PathBuf::from("crates/core/tests/fixtures/mcp/*.json")],
             _ => Vec::new(),
         };
@@ -157,12 +182,29 @@ impl CapabilityScanner {
             "fixture-fast-reviewer" => vec![SlashCommandRef {
                 name: "/review".to_string(),
                 source_agent: agent.id.clone(),
-                description: Some("Run a deterministic fixture review".to_string()),
+                description: Some("运行一次确定性的模拟审阅".to_string()),
             }],
             "codex" => vec![SlashCommandRef {
                 name: "/compact".to_string(),
                 source_agent: agent.id.clone(),
                 description: Some("Compact the active conversation context".to_string()),
+            }],
+            "claude-code" => vec![
+                SlashCommandRef {
+                    name: "/config".to_string(),
+                    source_agent: agent.id.clone(),
+                    description: Some("打开或修改 Claude Code 设置".to_string()),
+                },
+                SlashCommandRef {
+                    name: "/mcp".to_string(),
+                    source_agent: agent.id.clone(),
+                    description: Some("管理 Claude Code MCP 连接".to_string()),
+                },
+            ],
+            "gemini" => vec![SlashCommandRef {
+                name: "/help".to_string(),
+                source_agent: agent.id.clone(),
+                description: Some("查看 Gemini CLI 会话命令".to_string()),
             }],
             _ => Vec::new(),
         };
@@ -182,7 +224,7 @@ impl CapabilityScanner {
                 },
                 ConfigOption {
                     id: "approval-mode".to_string(),
-                    label: "Approval Mode".to_string(),
+                    label: "审批模式".to_string(),
                     category: Some("permission".to_string()),
                     value_type: "select".to_string(),
                     choices: vec!["ask".to_string(), "deny".to_string()],
@@ -191,9 +233,9 @@ impl CapabilityScanner {
             ]);
         }
 
-        let output = Command::new(&agent.launch.command)
-            .args(&agent.launch.args)
-            .arg("--help")
+        let mut args = agent.launch.args.clone();
+        args.push("--help".to_string());
+        let output = crate::process::command_with_args(&agent.launch.command, &args)
             .output()
             .await
             .with_context(|| format!("failed to probe agent {}", agent.name))?;
@@ -244,6 +286,9 @@ fn extract_frontmatter_field(content: &str, key: &str) -> Option<String> {
 fn mcp_servers_from_file(agent: &AgentProfile, path: &Path) -> Result<Vec<McpServerRef>> {
     let content = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read MCP config {}", path.display()))?;
+    if path.extension().and_then(|extension| extension.to_str()) == Some("toml") {
+        return mcp_servers_from_toml(agent, path, &content);
+    }
     let json: Value = serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!({}));
     let mut servers = Vec::new();
 
@@ -266,6 +311,52 @@ fn mcp_servers_from_file(agent: &AgentProfile, path: &Path) -> Result<Vec<McpSer
         }
     }
 
+    if let Some(map) = json.get("mcp").and_then(|value| value.as_object()) {
+        for (name, value) in map {
+            let enabled = if let Some(enabled) = value.get("enabled").and_then(|enabled| enabled.as_bool()) {
+                enabled
+            } else if let Some(disabled) = value.get("disabled").and_then(|disabled| disabled.as_bool()) {
+                !disabled
+            } else {
+                true
+            };
+            servers.push(McpServerRef {
+                id: format!("{}:{}", agent.id, crate::discovery::slug(name)),
+                name: name.clone(),
+                source_agent: agent.id.clone(),
+                source_path: Some(path.display().to_string()),
+                command: value
+                    .get("command")
+                    .or_else(|| value.get("cmd"))
+                    .and_then(|command| command.as_str())
+                    .map(ToOwned::to_owned),
+                enabled,
+            });
+        }
+    }
+
+    Ok(servers)
+}
+
+fn mcp_servers_from_toml(agent: &AgentProfile, path: &Path, content: &str) -> Result<Vec<McpServerRef>> {
+    let value: toml::Value = toml::from_str(content).unwrap_or_else(|_| toml::Value::Table(Default::default()));
+    let mut servers = Vec::new();
+    if let Some(table) = value.get("mcp_servers").and_then(|value| value.as_table()) {
+        for (name, value) in table {
+            let command = value
+                .get("command")
+                .and_then(|command| command.as_str())
+                .map(ToOwned::to_owned);
+            servers.push(McpServerRef {
+                id: format!("{}:{}", agent.id, crate::discovery::slug(name)),
+                name: name.clone(),
+                source_agent: agent.id.clone(),
+                source_path: Some(path.display().to_string()),
+                command,
+                enabled: true,
+            });
+        }
+    }
     Ok(servers)
 }
 
@@ -312,4 +403,3 @@ mod tests {
             .any(|command| command.name == "/review"));
     }
 }
-

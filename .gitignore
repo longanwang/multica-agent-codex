@@ -3,6 +3,7 @@ dist/
 target/
 .tauri/
 .vite/
+apps/desktop/src-tauri/gen/
 *.db
 *.db-shm
 *.db-wal
@@ -10,4 +11,3 @@ target/
 .env
 .env.*
 !/.env.example
-

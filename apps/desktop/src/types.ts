@@ -17,11 +17,14 @@ export interface AgentLaunch {
   cwd?: string | null;
 }
 
+export type AgentRuntime = 'acpStdio' | 'cli' | 'fixture';
+
 export interface AgentProfile {
   id: string;
   name: string;
   version?: string | null;
   launch: AgentLaunch;
+  runtime: AgentRuntime;
   acp: AcpSupport;
   source: AgentSource;
   detectedPath?: string | null;
@@ -131,4 +134,3 @@ export interface DashboardSnapshot {
   tasks: TaskSummary[];
   approvals: PermissionRequest[];
 }
-

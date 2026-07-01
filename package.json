@@ -2,13 +2,15 @@
   "name": "multica-agent-codex",
   "version": "0.1.0",
   "private": true,
-  "description": "Local multi-agent control shell for ACP-compatible coding agents.",
+  "description": "用于管理多个 ACP 编码智能体的本地优先控制壳。",
   "workspaces": [
     "apps/desktop"
   ],
   "scripts": {
     "dev": "npm --workspace apps/desktop run dev",
+    "tauri:dev": "node scripts/run-tauri-dev.mjs",
     "build": "npm --workspace apps/desktop run build",
+    "tauri:build": "npm --workspace apps/desktop run tauri:build",
     "typecheck": "npm --workspace apps/desktop run typecheck",
     "preview": "npm --workspace apps/desktop run preview"
   },
@@ -16,4 +18,3 @@
     "node": ">=20"
   }
 }
-

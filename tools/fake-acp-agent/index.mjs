@@ -37,7 +37,7 @@ rl.on('line', (line) => {
       result: {
         protocolVersion: 1,
         agentInfo: {
-          name: 'Fake ACP Agent',
+          name: '模拟 ACP 智能体',
           version: '0.1.0',
         },
         capabilities: {
@@ -73,7 +73,7 @@ rl.on('line', (line) => {
         id: request.id,
         error: {
           code: -32000,
-          message: 'Fake ACP agent forced failure',
+          message: '模拟 ACP 智能体按要求返回失败',
         },
       });
       return;
@@ -89,7 +89,7 @@ rl.on('line', (line) => {
         content: [
           {
             type: 'text',
-            text: `Fake ACP Agent completed prompt: ${prompt.slice(0, 160)}`,
+            text: `模拟 ACP 智能体已完成提示词：${prompt.slice(0, 160)}`,
           },
         ],
       },
@@ -105,4 +105,3 @@ rl.on('line', (line) => {
     },
   });
 });
-

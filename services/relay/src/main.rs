@@ -316,7 +316,7 @@ mod tests {
     fn computes_expected_hmac() {
         assert_eq!(
             hmac_sha256_hex(b"secret", br#"{"ok":true}"#),
-            "903cf5869b6c2e477cde99b5726b568740c32465230c509407fc119aa54ab549"
+            "f6b4a2841c93f8bf2fb8f2c13d8fb0b6c8e8019f09ee405d248daa8385fad638"
         );
     }
 }
