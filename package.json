@@ -1,0 +1,19 @@
+{
+  "name": "multica-agent-codex",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local multi-agent control shell for ACP-compatible coding agents.",
+  "workspaces": [
+    "apps/desktop"
+  ],
+  "scripts": {
+    "dev": "npm --workspace apps/desktop run dev",
+    "build": "npm --workspace apps/desktop run build",
+    "typecheck": "npm --workspace apps/desktop run typecheck",
+    "preview": "npm --workspace apps/desktop run preview"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
+

@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "fixture-search": {
+      "command": "node",
+      "args": ["server.mjs"],
+      "enabled": true
+    }
+  }
+}
+
