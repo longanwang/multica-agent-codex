@@ -8,11 +8,12 @@ const desktopRoot = path.join(repoRoot, 'apps', 'desktop');
 const port = 1420;
 const host = '127.0.0.1';
 const devUrl = `http://${host}:${port}/`;
+let viteChild = null;
 
 const existing = await readExistingServer();
 if (existing.up && existing.body.includes('<title>Multica</title>')) {
   console.log(`复用已有 Multica Vite dev server: ${devUrl}`);
-  keepAlive();
+  watchReusedServer();
 } else if (existing.up) {
   console.error(`端口 ${port} 已被其他服务占用，请先关闭该服务后再启动 Multica。`);
   process.exit(1);
@@ -22,18 +23,18 @@ if (existing.up && existing.body.includes('<title>Multica</title>')) {
 
 function startVite() {
   const viteBin = path.join(repoRoot, 'node_modules', 'vite', 'bin', 'vite.js');
-  const child = spawn(process.execPath, [viteBin, '--host', host, '--port', String(port), '--strictPort'], {
+  viteChild = spawn(process.execPath, [viteBin, '--host', host, '--port', String(port), '--strictPort'], {
     cwd: desktopRoot,
     stdio: 'inherit',
   });
 
   for (const signal of ['SIGINT', 'SIGTERM']) {
     process.on(signal, () => {
-      child.kill(signal);
+      viteChild?.kill(signal);
     });
   }
 
-  child.on('exit', (code, signal) => {
+  viteChild.on('exit', (code, signal) => {
     if (signal) {
       process.exit(1);
       return;
@@ -42,8 +43,15 @@ function startVite() {
   });
 }
 
-function keepAlive() {
-  setInterval(() => {}, 24 * 60 * 60 * 1000);
+function watchReusedServer() {
+  const interval = setInterval(async () => {
+    const current = await readExistingServer();
+    if (!current.up) {
+      clearInterval(interval);
+      console.warn(`已复用的 Multica Vite dev server 已退出，重新启动: ${devUrl}`);
+      startVite();
+    }
+  }, 1000);
 }
 
 function readExistingServer() {

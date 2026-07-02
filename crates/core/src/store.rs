@@ -460,4 +460,3 @@ fn permission_status_name(status: &PermissionStatus) -> &'static str {
         PermissionStatus::Expired => "expired",
     }
 }
-

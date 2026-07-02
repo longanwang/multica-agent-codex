@@ -7,9 +7,21 @@ const rl = readline.createInterface({
 });
 
 const mode = process.argv.includes('--fail') ? 'fail' : 'success';
+const stream = process.argv.includes('--stream');
 
 function send(payload) {
   process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', ...payload })}\n`);
+}
+
+function readPrompt(params) {
+  const prompt = params?.prompt;
+  if (!Array.isArray(prompt)) {
+    return '';
+  }
+  return prompt
+    .map((part) => part?.text)
+    .filter(Boolean)
+    .join('\n');
 }
 
 rl.on('line', (line) => {
@@ -40,8 +52,8 @@ rl.on('line', (line) => {
           name: '模拟 ACP 智能体',
           version: '0.1.0',
         },
-        capabilities: {
-          sessions: true,
+        agentCapabilities: {
+          promptCapabilities: {},
         },
       },
     });
@@ -49,6 +61,20 @@ rl.on('line', (line) => {
   }
 
   if (request.method === 'session/new') {
+    if (typeof request.params?.cwd !== 'string' || request.params.cwd.length === 0) {
+      send({
+        id: request.id,
+        error: {
+          code: -32602,
+          message: 'Invalid params',
+          data: {
+            cwd: ['expected non-empty string'],
+          },
+        },
+      });
+      return;
+    }
+
     send({
       id: request.id,
       result: {
@@ -56,10 +82,14 @@ rl.on('line', (line) => {
         configOptions: [
           {
             id: 'fixture-small',
-            label: 'Fixture Small',
+            name: 'Fixture Small',
             category: 'model',
-            valueType: 'select',
-            choices: ['fixture-small', 'fixture-large'],
+            type: 'select',
+            currentValue: 'fixture-small',
+            options: [
+              { value: 'fixture-small', name: 'Fixture Small' },
+              { value: 'fixture-large', name: 'Fixture Large' },
+            ],
           },
         ],
       },
@@ -79,17 +109,38 @@ rl.on('line', (line) => {
       return;
     }
 
-    const prompt = request.params?.prompt
-      ?.map((part) => part.text)
-      .filter(Boolean)
-      .join('\n') ?? '';
+    const text = `模拟 ACP 智能体已完成提示词：${readPrompt(request.params).slice(0, 160)}`;
+    if (stream) {
+      send({
+        method: 'session/update',
+        params: {
+          sessionId: request.params?.sessionId,
+          update: {
+            sessionUpdate: 'agent_message_chunk',
+            messageId: 'fake-message',
+            content: {
+              type: 'text',
+              text,
+            },
+          },
+        },
+      });
+      send({
+        id: request.id,
+        result: {
+          stopReason: 'end_turn',
+        },
+      });
+      return;
+    }
+
     send({
       id: request.id,
       result: {
         content: [
           {
             type: 'text',
-            text: `模拟 ACP 智能体已完成提示词：${prompt.slice(0, 160)}`,
+            text,
           },
         ],
       },

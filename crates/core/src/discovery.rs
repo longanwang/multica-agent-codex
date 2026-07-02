@@ -69,7 +69,11 @@ impl AgentDiscovery {
                     candidate.id,
                     candidate.display_name,
                     &path.display().to_string(),
-                    candidate.args.iter().map(|arg| (*arg).to_string()).collect(),
+                    candidate
+                        .args
+                        .iter()
+                        .map(|arg| (*arg).to_string())
+                        .collect(),
                     candidate.runtime.clone(),
                     candidate.acp.clone(),
                     Some(path),
@@ -150,7 +154,8 @@ fn known_agent_candidates() -> Vec<KnownAgent> {
             args: &[],
             runtime: AgentRuntime::Cli,
             acp: AcpSupport::Unavailable {
-                reason: "已发现 Gemini CLI；当前使用官方 -p/--prompt headless 模式运行。".to_string(),
+                reason: "已发现 Gemini CLI；当前使用官方 -p/--prompt headless 模式运行。"
+                    .to_string(),
             },
         },
         KnownAgent {
@@ -169,20 +174,34 @@ fn known_agent_candidates() -> Vec<KnownAgent> {
 fn resolve_command(command: &str) -> Option<PathBuf> {
     let direct = PathBuf::from(command);
     if direct.exists() {
-        return Some(direct);
+        return Some(normalize_windows_command_path(direct));
     }
     if let Ok(path) = which::which(command) {
-        return Some(path);
+        return Some(normalize_windows_command_path(path));
     }
 
     for base in common_windows_roots() {
         for candidate in command_candidates(&base, command) {
             if candidate.exists() {
-                return Some(candidate);
+                return Some(normalize_windows_command_path(candidate));
             }
         }
     }
     None
+}
+
+fn normalize_windows_command_path(path: PathBuf) -> PathBuf {
+    if !cfg!(windows) || path.extension().is_some() {
+        return path;
+    }
+
+    for extension in ["exe", "cmd", "bat", "ps1"] {
+        let candidate = path.with_extension(extension);
+        if candidate.exists() {
+            return candidate;
+        }
+    }
+    path
 }
 
 fn common_windows_roots() -> Vec<PathBuf> {
@@ -198,7 +217,12 @@ fn common_windows_roots() -> Vec<PathBuf> {
                 .join("bin"),
         );
     }
-    for key in ["LOCALAPPDATA", "APPDATA", "ProgramFiles", "ProgramFiles(x86)"] {
+    for key in [
+        "LOCALAPPDATA",
+        "APPDATA",
+        "ProgramFiles",
+        "ProgramFiles(x86)",
+    ] {
         if let Some(value) = std::env::var_os(key) {
             roots.push(PathBuf::from(value));
         }
@@ -211,11 +235,11 @@ fn command_candidates(base: &Path, command: &str) -> Vec<PathBuf> {
         vec![command.to_string()]
     } else {
         vec![
-            command.to_string(),
             format!("{command}.exe"),
             format!("{command}.cmd"),
             format!("{command}.bat"),
             format!("{command}.ps1"),
+            command.to_string(),
         ]
     };
 
@@ -256,7 +280,11 @@ fn profile_from_command(
     }
 }
 
-pub fn manual_profile(name: impl Into<String>, command: impl Into<String>, args: Vec<String>) -> AgentProfile {
+pub fn manual_profile(
+    name: impl Into<String>,
+    command: impl Into<String>,
+    args: Vec<String>,
+) -> AgentProfile {
     let name = name.into();
     let command = command.into();
     AgentProfile {
@@ -347,5 +375,29 @@ mod tests {
     fn creates_stable_manual_profile_id() {
         let profile = manual_profile("Claude Code Local", "claude", vec![]);
         assert_eq!(profile.id, "manual-claude-code-local");
+    }
+
+    #[test]
+    fn windows_command_candidates_prefer_executable_extensions() {
+        let candidates = command_candidates(Path::new("C:/tools"), "opencode");
+        let names = [0, 2, 4, 6]
+            .into_iter()
+            .map(|index| {
+                candidates[index]
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            names,
+            vec![
+                "opencode.exe".to_string(),
+                "opencode.cmd".to_string(),
+                "opencode.bat".to_string(),
+                "opencode.ps1".to_string()
+            ]
+        );
     }
 }
