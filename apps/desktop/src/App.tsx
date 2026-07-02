@@ -74,6 +74,11 @@ const pageCopy: Record<NavId, { title: string; description: string }> = {
   },
 };
 
+type NoticeState = {
+  kind: 'success' | 'error';
+  message: string;
+};
+
 export function App() {
   const desktopRuntime = api.isDesktopRuntime();
   const [active, setActive] = useState<NavId>('agents');
@@ -82,7 +87,7 @@ export function App() {
   const [prompt, setPrompt] = useState('请审阅当前仓库的核心风险，并给出可执行的修复建议。');
   const [title, setTitle] = useState('本地 agent 并行审阅');
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<NoticeState | null>(null);
 
   useEffect(() => {
     void loadSnapshot(true);
@@ -98,6 +103,8 @@ export function App() {
       }
       setSnapshot(data);
       setSelectedAgents((current) => reconcileSelectedAgents(current, data.agents));
+    } catch (error) {
+      setNotice(errorNotice('加载控制台失败', error));
     } finally {
       setBusy(false);
     }
@@ -109,7 +116,9 @@ export function App() {
       const agents = await api.refreshAgents();
       setSnapshot((current) => (current ? { ...current, agents } : current));
       setSelectedAgents((current) => reconcileSelectedAgents(current, agents));
-      setNotice('智能体发现已刷新');
+      setNotice(successNotice('智能体发现已刷新'));
+    } catch (error) {
+      setNotice(errorNotice('刷新智能体失败', error));
     } finally {
       setBusy(false);
     }
@@ -120,7 +129,9 @@ export function App() {
     try {
       const capabilities = await api.refreshCapabilities();
       setSnapshot((current) => (current ? { ...current, capabilities } : current));
-      setNotice('能力清单已刷新');
+      setNotice(successNotice('能力清单已刷新'));
+    } catch (error) {
+      setNotice(errorNotice('刷新能力清单失败', error));
     } finally {
       setBusy(false);
     }
@@ -128,7 +139,7 @@ export function App() {
 
   async function addManualAgent(name: string, command: string, args: string[]) {
     if (!name.trim() || !command.trim()) {
-      setNotice('请填写智能体名称和启动命令');
+      setNotice(errorNotice('请填写智能体名称和启动命令'));
       return;
     }
     setBusy(true);
@@ -138,7 +149,9 @@ export function App() {
         current ? { ...current, agents: [agent, ...current.agents.filter((item) => item.id !== agent.id)] } : current,
       );
       setSelectedAgents((current) => (current.includes(agent.id) ? current : [...current, agent.id]));
-      setNotice(`${agent.name} 已添加到智能体列表`);
+      setNotice(successNotice(`${agent.name} 已添加到智能体列表`));
+    } catch (error) {
+      setNotice(errorNotice('添加手动智能体失败', error));
     } finally {
       setBusy(false);
     }
@@ -151,7 +164,7 @@ export function App() {
     }
     const selectedProfiles = snapshot.agents.filter((agent) => selectedAgents.includes(agent.id));
     if (!desktopRuntime && selectedProfiles.some((agent) => agent.source !== 'fixture')) {
-      setNotice('Web 预览只运行模拟智能体；真实调用本地 agent 请用 Tauri 桌面模式启动。');
+      setNotice(errorNotice('Web 预览只运行模拟智能体；真实调用本地 agent 请用 Tauri 桌面模式启动。'));
       return;
     }
     setBusy(true);
@@ -161,7 +174,9 @@ export function App() {
         current ? { ...current, tasks: [task, ...current.tasks.filter((item) => item.task.id !== task.task.id)] } : current,
       );
       setActive('sessions');
-      setNotice('任务已提交并完成运行');
+      setNotice(taskNotice(task));
+    } catch (error) {
+      setNotice(errorNotice('任务提交失败', error));
     } finally {
       setBusy(false);
     }
@@ -174,7 +189,9 @@ export function App() {
       setSnapshot((current) =>
         current ? { ...current, approvals: current.approvals.filter((approval) => approval.id !== request.id) } : current,
       );
-      setNotice(approved ? '远程请求已通过' : '远程请求已拒绝');
+      setNotice(successNotice(approved ? '远程请求已通过' : '远程请求已拒绝'));
+    } catch (error) {
+      setNotice(errorNotice('处理审批失败', error));
     } finally {
       setBusy(false);
     }
@@ -188,7 +205,9 @@ export function App() {
         current ? { ...current, approvals: [approval, ...current.approvals.filter((item) => item.id !== approval.id)] } : current,
       );
       setActive('approvals');
-      setNotice('连接器消息已进入本机审批队列');
+      setNotice(successNotice('连接器消息已进入本机审批队列'));
+    } catch (error) {
+      setNotice(errorNotice('写入连接器消息失败', error));
     } finally {
       setBusy(false);
     }
@@ -305,7 +324,7 @@ export function App() {
         </header>
 
         {!desktopRuntime ? <RuntimeModeBanner /> : null}
-        {notice ? <Notice message={notice} onClose={() => setNotice(null)} /> : null}
+        {notice ? <Notice notice={notice} onClose={() => setNotice(null)} /> : null}
         {content}
       </main>
     </div>
@@ -453,7 +472,7 @@ function SessionsWorkspace({ tasks, agentName }: { tasks: TaskSummary[]; agentNa
                 <div className="run-item" key={run.id}>
                   <span>{agentName(run.agentId)}</span>
                   <StatusPill status={run.status} label={formatRunStatus(run.status)} />
-                  <p>{run.result || run.error || '无输出'}</p>
+                  <p className={run.error ? 'run-output error' : 'run-output'}>{run.result || run.error || '无输出'}</p>
                 </div>
               ))}
             </div>
@@ -734,11 +753,11 @@ function RuntimeModeBanner() {
   );
 }
 
-function Notice({ message, onClose }: { message: string; onClose: () => void }) {
+function Notice({ notice, onClose }: { notice: NoticeState; onClose: () => void }) {
   return (
-    <div className="notice" role="status">
-      <Check size={16} aria-hidden="true" />
-      <span>{message}</span>
+    <div className={`notice ${notice.kind}`} role={notice.kind === 'error' ? 'alert' : 'status'}>
+      {notice.kind === 'error' ? <ShieldAlert size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}
+      <span>{notice.message}</span>
       <button type="button" onClick={onClose} title="关闭提示">
         <X size={14} aria-hidden="true" />
       </button>
@@ -791,6 +810,38 @@ function LoadingPanel() {
       <span>正在加载本地控制平面</span>
     </section>
   );
+}
+
+function successNotice(message: string): NoticeState {
+  return { kind: 'success', message };
+}
+
+function errorNotice(message: string, error?: unknown): NoticeState {
+  const detail = errorToMessage(error);
+  return {
+    kind: 'error',
+    message: detail ? `${message}：${detail}` : message,
+  };
+}
+
+function taskNotice(task: TaskSummary): NoticeState {
+  const succeeded = task.runs.filter((run) => run.status === 'succeeded').length;
+  const failed = task.runs.filter((run) => run.status === 'failed').length;
+  const message = `任务完成：${succeeded} 个成功，${failed} 个失败`;
+  return failed > 0 ? errorNotice(message) : successNotice(message);
+}
+
+function errorToMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  if (error && typeof error === 'object' && 'message' in error) {
+    return String((error as { message: unknown }).message);
+  }
+  return '';
 }
 
 function reconcileSelectedAgents(current: string[], agents: AgentProfile[]) {

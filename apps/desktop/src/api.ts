@@ -28,8 +28,8 @@ const mockInvoke: Invoke = async (command, args) => {
     return structuredClone(mockDashboard.capabilities) as never;
   }
   if (command === 'create_task') {
-    const payload = args as { title: string; prompt: string; agent_ids: string[] };
-    return makeMockTask(payload.title, payload.prompt, payload.agent_ids) as never;
+    const payload = args as { title: string; prompt: string; agentIds: string[] };
+    return makeMockTask(payload.title, payload.prompt, payload.agentIds) as never;
   }
   if (command === 'add_manual_agent') {
     const payload = args as { name: string; command: string; args: string[] };
@@ -53,9 +53,9 @@ const mockInvoke: Invoke = async (command, args) => {
   if (command === 'ingest_connector_message') {
     const payload = args as {
       connector: string;
-      tenant_id: string;
-      conversation_id: string;
-      sender_id: string;
+      tenantId: string;
+      conversationId: string;
+      senderId: string;
       text: string;
       raw: unknown;
     };
@@ -64,12 +64,12 @@ const mockInvoke: Invoke = async (command, args) => {
       taskId: null,
       connectorMessageId: crypto.randomUUID(),
       kind: 'connectorReply',
-      summary: `${payload.connector} 用户 ${payload.sender_id} 请求启动智能体任务`,
+      summary: `${payload.connector} 用户 ${payload.senderId} 请求启动智能体任务`,
       details: {
         connector: payload.connector,
-        tenantId: payload.tenant_id,
-        conversationId: payload.conversation_id,
-        senderId: payload.sender_id,
+        tenantId: payload.tenantId,
+        conversationId: payload.conversationId,
+        senderId: payload.senderId,
         preview: payload.text.slice(0, 240),
       },
       status: 'pending',
@@ -88,7 +88,7 @@ export const api = {
   refreshAgents: () => invoke<DashboardSnapshot['agents']>('refresh_agents'),
   refreshCapabilities: () => invoke<CapabilityInventory[]>('refresh_capabilities'),
   createTask: (title: string, prompt: string, agentIds: string[]) =>
-    invoke<TaskSummary>('create_task', { title, prompt, agent_ids: agentIds }),
+    invoke<TaskSummary>('create_task', { title, prompt, agentIds }),
   addManualAgent: (name: string, command: string, args: string[]) =>
     invoke<AgentProfile>('add_manual_agent', { name, command, args }),
   ingestConnectorMessage: (message: {
@@ -100,14 +100,14 @@ export const api = {
   }) =>
     invoke<PermissionRequest>('ingest_connector_message', {
       connector: message.connector,
-      tenant_id: message.tenantId,
-      conversation_id: message.conversationId,
-      sender_id: message.senderId,
+      tenantId: message.tenantId,
+      conversationId: message.conversationId,
+      senderId: message.senderId,
       text: message.text,
       raw: message,
     }),
   decidePermission: (requestId: string, approved: boolean) =>
-    invoke<void>('decide_permission', { request_id: requestId, approved }),
+    invoke<void>('decide_permission', { requestId, approved }),
 };
 
 function slug(value: string): string {

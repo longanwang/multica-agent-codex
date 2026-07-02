@@ -246,6 +246,18 @@ button {
   font-weight: 700;
 }
 
+.notice.error {
+  border-color: #f1c2c0;
+  background: #fff1ef;
+  color: #a13a34;
+}
+
+.notice.success {
+  border-color: #b8ece0;
+  background: #edfbf8;
+  color: #146655;
+}
+
 .notice button {
   display: inline-grid;
   place-items: center;
@@ -785,6 +797,16 @@ button {
   color: #687681;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.run-output {
+  overflow: auto;
+  max-height: 180px;
+  white-space: pre-wrap;
+}
+
+.run-output.error {
+  color: #a13a34;
 }
 
 .run-list {

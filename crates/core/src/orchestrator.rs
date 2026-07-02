@@ -77,9 +77,7 @@ async fn run_single_agent(
 
     let result = match agent.runtime {
         AgentRuntime::Fixture => run_fake_agent(&agent, &prompt).await,
-        AgentRuntime::AcpStdio => AcpProcessClient::run_prompt(&agent.launch, &prompt, agent.launch.cwd.clone())
-            .await
-            .map(|result| result.text),
+        AgentRuntime::AcpStdio => run_acp_agent(&agent, &prompt).await,
         AgentRuntime::Cli => run_cli_agent(&agent, &prompt).await,
     };
 
@@ -96,6 +94,16 @@ async fn run_single_agent(
     }
     store.upsert_agent_run(&run)?;
     Ok(run)
+}
+
+async fn run_acp_agent(agent: &AgentProfile, prompt: &str) -> Result<String> {
+    tokio::time::timeout(
+        Duration::from_secs(900),
+        AcpProcessClient::run_prompt(&agent.launch, prompt, agent.launch.cwd.clone()),
+    )
+    .await
+    .context("ACP agent run timed out after 15 minutes")?
+    .map(|result| result.text)
 }
 
 async fn run_cli_agent(agent: &AgentProfile, prompt: &str) -> Result<String> {
